@@ -1,0 +1,14 @@
+{
+  "type": "ebook",
+  "name": "Kol Novel Repo",
+  "plugins": [
+    {
+      "id": "kolnovel",
+      "name": "ملوك الروايات (Kol Novel)",
+      "version": "1.0.0",
+      "lang": "ar",
+      "nsfw": false,
+      "entry": "kolnovel.plugin.js"
+    }
+  ]
+}
