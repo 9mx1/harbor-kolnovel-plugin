@@ -221,7 +221,8 @@ const plugin = {
     }
     const doc = harbor.parseHtml("<div id='kol-body'>" + html + "</div>");
     return doc
-      .querySelectorAll("#kol-body > p, #kol-body > blockquote")
+      // Some chapters wrap their paragraphs in div.epcontent; selector lists keep DOM order.
+      .querySelectorAll("#kol-body > p, #kol-body > blockquote, #kol-body > .epcontent > p, #kol-body > .epcontent > blockquote")
       .map((n) => n.text().replace(/ /g, " ").trim())
       .filter(Boolean)
       .join("\n\n");
