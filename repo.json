@@ -1,6 +1,6 @@
 {
   "type": "ebook",
-  "name": "Kol Novel Repo",
+  "name": "Arabic Novels Repo",
   "plugins": [
     {
       "id": "kolnovel",
@@ -9,6 +9,15 @@
       "lang": "ar",
       "nsfw": false,
       "entry": "kolnovel.plugin.js"
+    },
+    {
+      "id": "sunovels",
+      "name": "شمس الروايات (Sunovels)",
+      "version": "1.0.0",
+      "lang": "ar",
+      "nsfw": false,
+      "icon": "https://sunovels.com/favicon.ico",
+      "entry": "sunovels.plugin.js"
     }
   ]
 }
