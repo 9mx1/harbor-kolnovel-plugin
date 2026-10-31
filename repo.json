@@ -5,7 +5,7 @@
     {
       "id": "kolnovel",
       "name": "ملوك الروايات (Kol Novel)",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "lang": "ar",
       "nsfw": false,
       "entry": "kolnovel.plugin.js"
@@ -13,7 +13,7 @@
     {
       "id": "sunovels",
       "name": "شمس الروايات (Sunovels)",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "lang": "ar",
       "nsfw": false,
       "icon": "https://sunovels.com/favicon.ico",

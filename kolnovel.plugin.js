@@ -53,9 +53,18 @@ async function getDoc(path) {
   return harbor.parseHtml(await request(BASE + path, "text"));
 }
 
+// Normalize to a single level of percent-encoding; malformed escapes are kept as-is.
+function encodeOnce(url) {
+  try {
+    return encodeURI(decodeURI(url));
+  } catch (e) {
+    return url;
+  }
+}
+
 function abs(url) {
   if (!url) return undefined;
-  if (/^https?:\/\//i.test(url)) return encodeURI(decodeURI(url));
+  if (/^https?:\/\//i.test(url)) return encodeOnce(url);
   if (url.startsWith("//")) return "https:" + url;
   if (url.startsWith("/")) return BASE + url;
   return BASE + "/" + url;
@@ -369,7 +378,9 @@ const plugin = {
     return cardsFromDoc(doc);
   },
 
-  async search(query, offset) {
+  async search(query, offset, tagId) {
+    // A blank query (Harbor's browse view) lists the catalog.
+    if (!clean(query)) return plugin.popular(offset, tagId);
     try {
       const cursor = offset > 0 ? "&cursor=" + offset : "";
       const res = await getJson("/discover?q=" + encodeURIComponent(query) + cursor);

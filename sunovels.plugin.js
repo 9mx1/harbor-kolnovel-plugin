@@ -35,11 +35,20 @@ async function getHtml(path) {
   throw lastErr;
 }
 
+// Normalize to a single level of percent-encoding; malformed escapes are kept as-is.
+function encodeOnce(url) {
+  try {
+    return encodeURI(decodeURI(url));
+  } catch (e) {
+    return url;
+  }
+}
+
 function abs(url) {
   if (!url || /placeholder/.test(url)) return undefined;
-  if (/^https?:\/\//i.test(url)) return encodeURI(decodeURI(url));
+  if (/^https?:\/\//i.test(url)) return encodeOnce(url);
   if (url.startsWith("//")) return "https:" + url;
-  return BASE + (url.startsWith("/") ? "" : "/") + encodeURI(decodeURI(url));
+  return BASE + (url.startsWith("/") ? "" : "/") + encodeOnce(url);
 }
 
 function num(text) {
@@ -142,8 +151,10 @@ const plugin = {
     return cards(await getHtml("/library?page=" + page + status));
   },
 
-  // The search page returns every match at once.
-  async search(query, offset) {
+  // The search page returns every match at once. A blank query (Harbor's browse
+  // view) lists the library instead, since the site's search returns nothing for it.
+  async search(query, offset, tagId) {
+    if (!clean(query)) return plugin.popular(offset, tagId);
     if (offset > 0) return [];
     return cards(await getHtml("/search/?title=" + encodeURIComponent(query)));
   },
