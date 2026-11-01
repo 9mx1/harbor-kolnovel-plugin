@@ -44,13 +44,27 @@ async function request(url, responseType) {
   throw lastErr;
 }
 
+// In Harbor, responseType "json" resolves to the parsed body itself (null when the
+// response is not JSON, e.g. a WordPress error page), not to { ok, body }.
 async function getJson(path) {
-  const body = await request(API + path, "json");
-  return typeof body === "string" ? JSON.parse(body) : body;
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const body = await harbor.http(API + path, { responseType: "json", timeoutMs: TIMEOUT });
+      if (!body || typeof body !== "object" || (body.code && !body.data)) {
+        throw new Error("bad api response for " + path);
+      }
+      return body;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 
+// harbor.parseHtml is asynchronous in Harbor (it parses on the host).
 async function getDoc(path) {
-  return harbor.parseHtml(await request(BASE + path, "text"));
+  return await harbor.parseHtml(await request(BASE + path, "text"));
 }
 
 // Normalize to a single level of percent-encoding; malformed escapes are kept as-is.
@@ -238,13 +252,35 @@ function htmlDetail(doc, id) {
 
 // ---- chapters --------------------------------------------------------------------
 
-// reading-list returns 100 chapters per call, oldest first, with a cursor.
+// reading-list returns 100 chapters per call, oldest first. Its cursor is the item
+// offset, so once the first page reports the total, the rest are fetched in
+// parallel: Harbor gives a chapters() call 25 s in total.
 async function apiChapters(tid) {
+  const listPath = (cursor) => "/titles/" + tid + "/reading-list" + (cursor ? "?cursor=" + cursor : "");
+  const first = await getJson(listPath(""));
+  const pages = [first];
+  const total = Number(first.meta?.total);
+  const step = (first.data || []).length;
+  if (first.meta?.has_more && /^\d+$/.test(String(first.meta.next_cursor)) && total > 0 && step > 0) {
+    const cursors = [];
+    for (let c = Number(first.meta.next_cursor); c < total; c += step) cursors.push(c);
+    for (let i = 0; i < cursors.length; i += 5) {
+      pages.push(...(await Promise.all(cursors.slice(i, i + 5).map((c) => getJson(listPath(c))))));
+    }
+  } else {
+    // Opaque cursor: walk it one page at a time.
+    let res = first;
+    for (let guard = 0; guard < 500 && res.meta?.has_more && res.meta.next_cursor; guard++) {
+      res = await getJson(listPath(res.meta.next_cursor));
+      pages.push(res);
+    }
+  }
   const out = [];
-  let cursor = "";
-  for (let guard = 0; guard < 500; guard++) {
-    const res = await getJson("/titles/" + tid + "/reading-list" + (cursor ? "?cursor=" + cursor : ""));
+  const seen = new Set();
+  for (const res of pages) {
     for (const c of res.data || []) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
       // The volume key comes from the site's own volume field, never from the chapter title.
       const volumeTitle = clean(c.volume) || undefined;
       out.push({
@@ -257,8 +293,6 @@ async function apiChapters(tid) {
         publishAt: c.published_at || undefined,
       });
     }
-    if (!res.meta?.has_more || !res.meta.next_cursor) break;
-    cursor = res.meta.next_cursor;
   }
   return out;
 }
@@ -353,7 +387,7 @@ function hiddenClasses(html) {
 
 async function htmlContent(path) {
   const html = await request(BASE + path, "text");
-  const doc = harbor.parseHtml(html);
+  const doc = await harbor.parseHtml(html);
   const hidden = hiddenClasses(html);
   return doc
     .querySelectorAll("div.epcontent.entry-content > p, div.epcontent.entry-content > blockquote")
@@ -426,7 +460,9 @@ const plugin = {
     if (res.data?.access && res.data.access.has_access === false) {
       throw new Error("This chapter is locked on kolnovel.com");
     }
-    const doc = harbor.parseHtml("<div id='kol-body'>" + (res.data?.entry?.content || "") + "</div>");
+    const doc = await harbor.parseHtml(
+      "<!doctype html><html><body><div id='kol-body'>" + (res.data?.entry?.content || "") + "</div></body></html>",
+    );
     return paragraphs(doc, "#kol-body");
   },
 

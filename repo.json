@@ -5,7 +5,7 @@
     {
       "id": "kolnovel",
       "name": "ملوك الروايات (Kol Novel)",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "lang": "ar",
       "nsfw": false,
       "entry": "kolnovel.plugin.js"
