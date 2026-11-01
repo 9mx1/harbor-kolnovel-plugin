@@ -87,8 +87,9 @@ function coverMap(html) {
   return map;
 }
 
-function cards(html) {
-  const doc = harbor.parseHtml(html);
+// harbor.parseHtml is asynchronous in Harbor (it parses on the host).
+async function cards(html) {
+  const doc = await harbor.parseHtml(html);
   const covers = coverMap(html);
   return doc
     .querySelectorAll("li.list-item")
@@ -148,7 +149,7 @@ const plugin = {
   async popular(offset, tagId) {
     const page = Math.floor(offset / LIBRARY_PAGE_SIZE);
     const status = tagId && tagId.startsWith("status:") ? "&status=" + (tagId === "status:completed" ? "Completed" : "Ongoing") : "";
-    return cards(await getHtml("/library?page=" + page + status));
+    return await cards(await getHtml("/library?page=" + page + status));
   },
 
   // The search page returns every match at once. A blank query (Harbor's browse
@@ -156,12 +157,12 @@ const plugin = {
   async search(query, offset, tagId) {
     if (!clean(query)) return plugin.popular(offset, tagId);
     if (offset > 0) return [];
-    return cards(await getHtml("/search/?title=" + encodeURIComponent(query)));
+    return await cards(await getHtml("/search/?title=" + encodeURIComponent(query)));
   },
 
   async detail(id) {
     const html = await getHtml("/novel/" + id);
-    const doc = harbor.parseHtml(html);
+    const doc = await harbor.parseHtml(html);
     const head = doc.querySelector(".novel-header");
     if (!head) return null;
     const english = clean(head.querySelector("h1")?.text());
@@ -195,16 +196,16 @@ const plugin = {
   // The chapter tab is paged server-side: 50 per page, zero-based, oldest first.
   async chapters(id) {
     const path = (page) => "/novel/" + id + "?activeTab=chapters&sort=asc&page=" + page;
-    const first = harbor.parseHtml(await getHtml(path(0)));
+    const first = await harbor.parseHtml(await getHtml(path(0)));
     const pages = Math.max(
       1,
-      ...first.querySelectorAll(".pagination a[aria-label^='Page ']").map((a) => num(a.attr("aria-label")) || 0),
+      ...first.querySelectorAll(".pagination a[aria-label^=Page]").map((a) => num(a.attr("aria-label")) || 0),
     );
     const out = chapterRows(first, id);
     for (let p = 1; p < pages; p += 5) {
       const batch = [];
       for (let k = p; k < p + 5 && k < pages; k++) batch.push(k);
-      const docs = await Promise.all(batch.map(async (k) => harbor.parseHtml(await getHtml(path(k)))));
+      const docs = await Promise.all(batch.map(async (k) => await harbor.parseHtml(await getHtml(path(k)))));
       for (const doc of docs) out.push(...chapterRows(doc, id));
     }
     const seen = new Set();
@@ -216,7 +217,7 @@ const plugin = {
   // Chapter text is one <p> per paragraph inside div.chapter-content. Keep DOM order.
   async content(chapterId) {
     const html = await getHtml("/novel/" + chapterId);
-    const doc = harbor.parseHtml(html);
+    const doc = await harbor.parseHtml(html);
     const hidden = hiddenClasses(html);
     return doc
       .querySelectorAll("div.chapter-content > p, div.chapter-content > blockquote")
